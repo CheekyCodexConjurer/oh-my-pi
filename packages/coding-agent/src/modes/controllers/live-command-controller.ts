@@ -11,6 +11,8 @@ import type { InteractiveModeContext } from "../types";
 import { createAssistantMessageComponent } from "@oh-my-pi/pi-tui/prompt/interactive-context-helpers";
 
 import { cfgLiveVoice } from "../../live/settings";
+import { LiveVoiceSpeech } from "../../voice/live-speech";
+import { clearActiveVoiceSpeech, setActiveVoiceSpeech } from "../../voice/registry";
 
 const ANIMATION_INTERVAL_MS = 80;
 type LiveSessionFactory = (options: LiveSessionControllerOptions) => LiveSessionController;
@@ -43,6 +45,8 @@ export class LiveCommandController {
 	#assistantTranscriptComponent: AssistantMessageComponent | undefined;
 	#assistantTranscriptTurn = 0;
 	#assistantTranscriptStartedAt = 0;
+	/** Channel registered with the ask voice bridge while this session runs. */
+	#voiceSpeech: LiveVoiceSpeech | undefined;
 
 	constructor(ctx: InteractiveModeContext, createSession?: LiveSessionFactory) {
 		this.#ctx = ctx;
@@ -138,6 +142,9 @@ export class LiveCommandController {
 		};
 		const session = this.#createSession ? this.#createSession(options) : new LiveSessionController(options);
 		this.#session = session;
+		// The live voice answers ask dialogs while this session is connected.
+		this.#voiceSpeech = new LiveVoiceSpeech(session);
+		setActiveVoiceSpeech(this.#voiceSpeech);
 
 		try {
 			await session.start();
@@ -224,6 +231,8 @@ export class LiveCommandController {
 	#finish(session: LiveSessionController, error?: Error): void {
 		if (this.#session !== session) return;
 		this.#session = undefined;
+		clearActiveVoiceSpeech(this.#voiceSpeech);
+		this.#voiceSpeech = undefined;
 		this.#restoreEditor();
 		if (error) this.#ctx.showError(error.message);
 		const settling = session.stop().catch(cause => {

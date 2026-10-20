@@ -2,6 +2,7 @@ import type { AgentToolContext, ToolCallContext } from "@oh-my-pi/pi-agent-core"
 import type { CustomToolContext } from "../extensibility/custom-tools/types";
 import type { ExtensionUIContext } from "../extensibility/extensions/types";
 import { trackUserWaits, type UserWaitTracker } from "../extensibility/extensions/user-wait";
+import { decorateVoiceAsk } from "../voice/registry";
 
 declare module "@oh-my-pi/pi-agent-core" {
 	interface AgentToolContext extends CustomToolContext {
@@ -54,7 +55,9 @@ export class ToolContextStore {
 	}
 
 	setUIContext(uiContext: ExtensionUIContext, hasUI: boolean): void {
-		this.#uiContext = this.trackUserWait ? trackUserWaits(uiContext, this.trackUserWait) : uiContext;
+		const tracked = this.trackUserWait ? trackUserWaits(uiContext, this.trackUserWait) : uiContext;
+		// Spoken answers can resolve an `ask` dialog; approvals stay keyboard-only.
+		this.#uiContext = decorateVoiceAsk(tracked);
 		this.#hasUI = hasUI;
 	}
 

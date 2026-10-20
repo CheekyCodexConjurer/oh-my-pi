@@ -2,7 +2,7 @@ import * as os from "node:os";
 import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
 import type { AssistantMessage } from "@oh-my-pi/pi-ai";
 import { AudioCapture } from "@oh-my-pi/pi-natives";
-import { prompt } from "@oh-my-pi/pi-utils";
+import { logger, prompt } from "@oh-my-pi/pi-utils";
 import type { AgentSession } from "../session/agent-session";
 import type { AgentSessionEvent } from "../session/agent-session-events";
 import { LIVE_DELEGATION_MESSAGE_TYPE } from "../session/messages";
@@ -11,11 +11,13 @@ import liveInstructionsTemplate from "./prompts/live-instructions.md" with { typ
 import {
 	buildDelegationContextAppend,
 	buildSessionClose,
+	buildSessionContextAppend,
 	chunkLiveContext,
 	type LiveClientMessage,
 	type LiveServerEvent,
 } from "./protocol";
 import { CodexLiveTransport } from "./transport";
+import { LiveUtteranceQueue } from "./utterance-queue";
 import type { LivePhase } from "@oh-my-pi/pi-tui/apps/live-visualizer";
 import { DEFAULT_LIVE_VOICE } from "./voices";
 
@@ -124,6 +126,8 @@ export class LiveSessionController {
 	#userTranscriptTurn = 0;
 	#assistantTranscriptTurn = 0;
 	#lastTranscript: LiveTranscript | undefined;
+	/** Callers waiting for the next user utterance (voice ask bridge). */
+	#utterances = new LiveUtteranceQueue();
 
 	constructor(options: LiveSessionControllerOptions) {
 		this.#session = options.session;
@@ -141,6 +145,31 @@ export class LiveSessionController {
 	/** Whether microphone input is currently muted. */
 	get muted(): boolean {
 		return this.#muted;
+	}
+
+	/**
+	 * Hand text to the realtime model on the speakable channel.
+	 *
+	 * Used by the voice ask bridge to make the live voice read a pending
+	 * question aloud without starting a delegated session turn.
+	 */
+	appendSpokenContext(text: string): void {
+		const trimmed = text.trim();
+		if (!trimmed) return;
+		for (const chunk of chunkLiveContext(trimmed)) {
+			this.#queueSend(buildSessionContextAppend(chunk, "speakable"));
+		}
+	}
+
+	/**
+	 * Resolve with the next user utterance: the final user transcript of a turn
+	 * that started after this call, or the text of the delegation the realtime
+	 * model would otherwise run. Resolves `undefined` when `signal` aborts or the
+	 * session stops.
+	 */
+	waitForUserUtterance(signal?: AbortSignal): Promise<string | undefined> {
+		if (this.#stopped) return Promise.resolve(undefined);
+		return this.#utterances.wait(signal, this.#userTranscriptTurn);
 	}
 
 	/** Connects the realtime surface and starts microphone streaming. */
@@ -231,6 +260,7 @@ export class LiveSessionController {
 
 	async #stop(): Promise<void> {
 		this.#stopped = true;
+		this.#utterances.release();
 		this.#unsubscribeSession?.();
 		this.#unsubscribeSession = undefined;
 		let cleanupError: Error | undefined;
@@ -309,6 +339,16 @@ export class LiveSessionController {
 		}
 		request = request.trim();
 		if (!request) return;
+		// A pending voice question owns this utterance: hand it to the ask bridge
+		// instead of starting a session turn the user did not ask for.
+		if (this.#utterances.deliver(request, this.#userTranscriptTurn, { allowStale: true })) {
+			logger.debug("live: utterance routed to pending ask dialog");
+			return;
+		}
+		if (this.#utterances.shouldSuppressDelegation(this.#userTranscriptTurn)) {
+			logger.debug("live: delegation swallowed; its words answered the pending question");
+			return;
+		}
 		this.#activeDelegationId = event.item.id;
 		this.#emitPhase("working");
 		void this.#session
@@ -416,6 +456,8 @@ export class LiveSessionController {
 		}
 		const next = !wasFinal && current.startsWith(text) && current.length > text.length ? current : text;
 		this.#storeTranscript(role, next, true);
+		// The final user transcript is the spoken answer when a dialog is waiting.
+		if (role === "user") this.#utterances.deliver(next, this.#userTranscriptTurn);
 	}
 
 	#startTranscriptTurn(role: LiveTranscript["role"]): void {
