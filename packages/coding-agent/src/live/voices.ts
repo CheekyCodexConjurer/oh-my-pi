@@ -9,6 +9,7 @@ export const LIVE_VOICE_OPTIONS = [
 	{ value: "sol", label: "Sol" },
 	{ value: "spruce", label: "Spruce" },
 	{ value: "vale", label: "Vale" },
+	{ value: "rio", label: "Rio (pt-BR)" },
 ] as const;
 
 /** Accepted values for the live voice setting. */
