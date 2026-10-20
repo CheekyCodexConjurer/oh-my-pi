@@ -11,6 +11,7 @@
  */
 
 import type { AssistantMessage } from "@oh-my-pi/pi-ai";
+import { LIVE_DELEGATION_MESSAGE_TYPE } from "@oh-my-pi/pi-tui/chat/messages";
 import type { SessionEntry } from "../session/session-entries";
 import { type HindsightMessage, hasSubstantiveContent } from "./content";
 
@@ -25,6 +26,9 @@ export interface ReadonlySessionManagerLike {
  * - Skip entries whose type isn't `"message"` (compaction, branch_summary,
  *   custom_message, tool exec records, ...). Those don't represent a
  *   conversational turn, only the LLM's plain-text utterances do.
+ * - Exception: `live-delegation` custom messages. A GPT-Live voice session
+ *   reaches the transcript only through these entries, so skipping them would
+ *   drop everything the user said aloud.
  * - Skip messages whose role isn't `"user"` or `"assistant"`. We deliberately
  *   ignore `toolResult`, `bashExecution`, `hookMessage`, etc. — they're noise
  *   for memory purposes.
@@ -36,6 +40,13 @@ export function extractMessages(sessionManager: ReadonlySessionManagerLike): Hin
 	const messages: HindsightMessage[] = [];
 
 	for (const entry of sessionManager.getEntries()) {
+		if (entry.type === "custom_message") {
+			if (entry.customType !== LIVE_DELEGATION_MESSAGE_TYPE) continue;
+			const liveText = extractUserText({ content: entry.content });
+			if (!hasSubstantiveContent(liveText)) continue;
+			messages.push({ role: "user", content: liveText, timestamp: entry.timestamp });
+			continue;
+		}
 		if (entry.type !== "message") continue;
 		const msg = entry.message;
 		const role = msg.role;
@@ -57,6 +68,11 @@ export function extractMessages(sessionManager: ReadonlySessionManagerLike): Hin
 export function countUserTurns(sessionManager: ReadonlySessionManagerLike): number {
 	let count = 0;
 	for (const entry of sessionManager.getEntries()) {
+		if (entry.type === "custom_message") {
+			if (entry.customType !== LIVE_DELEGATION_MESSAGE_TYPE) continue;
+			if (hasSubstantiveContent(extractUserText({ content: entry.content }))) count++;
+			continue;
+		}
 		if (entry.type !== "message" || entry.message.role !== "user") continue;
 		if (hasSubstantiveContent(extractUserText(entry.message))) count++;
 	}
