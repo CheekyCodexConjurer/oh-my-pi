@@ -1,8 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type {
-	ExtensionAskDialogQuestion,
-	ExtensionAskDialogResult,
-} from "@oh-my-pi/pi-tui/overlays/ask-dialog";
+import type { ExtensionAskDialogQuestion, ExtensionAskDialogResult } from "@oh-my-pi/pi-tui/overlays/ask-dialog";
 import {
 	buildSpokenQuestion,
 	runVoiceAskDialog,

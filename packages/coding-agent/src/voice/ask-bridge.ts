@@ -7,10 +7,7 @@
  * dialog keeps running in parallel: whichever answers first wins, and an
  * unanswered question stays pending forever (no timeout, no auto-selection).
  */
-import type {
-	ExtensionAskDialogQuestion,
-	ExtensionAskDialogResult,
-} from "@oh-my-pi/pi-tui/overlays/ask-dialog";
+import type { ExtensionAskDialogQuestion, ExtensionAskDialogResult } from "@oh-my-pi/pi-tui/overlays/ask-dialog";
 import type { ExtensionUIDialogOptions } from "../extensibility/extensions/types";
 import { matchSpokenAnswer, type SpokenAnswer, toResultItem } from "./ask-answer";
 
@@ -43,11 +40,7 @@ export interface VoiceAskRequest {
 }
 
 /** Compose the spoken form of one question: header, options, and how to answer. */
-export function buildSpokenQuestion(
-	question: ExtensionAskDialogQuestion,
-	index: number,
-	total: number,
-): string {
+export function buildSpokenQuestion(question: ExtensionAskDialogQuestion, index: number, total: number): string {
 	const lines: string[] = [];
 	if (total > 1) lines.push(`Pergunta ${index + 1} de ${total}.`);
 	if (question.header?.trim()) lines.push(question.header.trim());
@@ -74,9 +67,7 @@ type DialogOutcome =
 	| { type: "dialog"; result: ExtensionAskDialogResult | undefined }
 	| { type: "dialog-error"; error: unknown };
 
-type ListenOutcome =
-	| { type: "spoken"; text: string | undefined }
-	| { type: "listen-error"; error: unknown };
+type ListenOutcome = { type: "spoken"; text: string | undefined } | { type: "listen-error"; error: unknown };
 
 /**
  * Replace the dialog signal and drop its deadline.
@@ -118,7 +109,10 @@ export async function runVoiceAskDialog(request: VoiceAskRequest): Promise<Exten
 	outer?.addEventListener("abort", onOuterAbort, { once: true });
 
 	try {
-		const dialogPromise: Promise<DialogOutcome> = open([...questions], withVoiceSignal(options, closeDialog.signal)).then(
+		const dialogPromise: Promise<DialogOutcome> = open(
+			[...questions],
+			withVoiceSignal(options, closeDialog.signal),
+		).then(
 			result => ({ type: "dialog", result }),
 			error => ({ type: "dialog-error", error }),
 		);

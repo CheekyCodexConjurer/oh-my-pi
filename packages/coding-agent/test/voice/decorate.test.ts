@@ -2,11 +2,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 import type { ExtensionAskDialogQuestion } from "@oh-my-pi/pi-tui/overlays/ask-dialog";
 import type { ExtensionUIContext } from "../../src/extensibility/extensions/types";
 import type { VoiceSpeech } from "../../src/voice/ask-bridge";
-import {
-	clearActiveVoiceSpeech,
-	decorateVoiceAsk,
-	setActiveVoiceSpeech,
-} from "../../src/voice/registry";
+import { clearActiveVoiceSpeech, decorateVoiceAsk, setActiveVoiceSpeech } from "../../src/voice/registry";
 
 class FakeSpeech implements VoiceSpeech {
 	readonly kind = "local" as const;

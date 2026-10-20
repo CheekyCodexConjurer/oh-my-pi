@@ -290,10 +290,7 @@ function matchMulti(text: string, question: ExtensionAskDialogQuestion): SpokenA
  * Returns `undefined` only for an empty utterance; a non-empty utterance that
  * matches nothing is a free-form answer.
  */
-export function matchSpokenAnswer(
-	question: ExtensionAskDialogQuestion,
-	transcript: string,
-): SpokenAnswer | undefined {
+export function matchSpokenAnswer(question: ExtensionAskDialogQuestion, transcript: string): SpokenAnswer | undefined {
 	const raw = transcript.trim();
 	if (!raw) return undefined;
 	const text = normalizeSpoken(raw);
@@ -311,7 +308,14 @@ export function matchSpokenAnswer(
 export function toResultItem(
 	question: ExtensionAskDialogQuestion,
 	answer: SpokenAnswer,
-): { id: string; question: string; options: string[]; multi: boolean; selectedOptions: string[]; customInput?: string } {
+): {
+	id: string;
+	question: string;
+	options: string[];
+	multi: boolean;
+	selectedOptions: string[];
+	customInput?: string;
+} {
 	const options = question.options.map(option => option.label);
 	const multi = question.multi ?? false;
 	const allowed = new Set(options);

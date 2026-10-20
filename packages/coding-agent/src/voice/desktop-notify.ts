@@ -39,11 +39,15 @@ export function notifyPendingQuestion(question: string, details?: string): void 
 		"[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Microsoft.PowerShell').Show($toast)",
 	].join("; ");
 	try {
-		const child = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script], {
-			stdio: "ignore",
-			windowsHide: true,
-			detached: true,
-		});
+		const child = spawn(
+			"powershell.exe",
+			["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script],
+			{
+				stdio: "ignore",
+				windowsHide: true,
+				detached: true,
+			},
+		);
 		// A spawn failure arrives as an async 'error' event, which the try/catch
 		// cannot see; without a listener Node would take the whole CLI down.
 		child.on("error", () => {});
